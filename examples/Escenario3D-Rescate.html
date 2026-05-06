@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Operación Rescate - Escenario 3D</title>
+    <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+    <style>
+        body { margin: 0; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+        #canvas-container { flex-grow: 1; }
+        
+        /* Requerimiento: Pie de página, Arial, Negrita, Color acorde */
+        footer {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            padding: 15px;
+            text-align: center;
+        }
+        footer h1 { margin: 0 0 10px 0; font-size: 24px; color: #e74c3c; }
+        .info-equipo { font-size: 14px; margin-bottom: 10px; }
+        .instrucciones { background-color: #34495e; padding: 10px; border-radius: 5px; font-size: 13px;}
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "../build/three.module.js",
+                "three/addons/": "./jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <footer>
+        <h1>Escenario 3D: Zona de Pruebas Tácticas</h1>
+        
+        <div class="info-equipo">
+            Integrantes: Iker Perez (Num. Control: 23200876) | Nancy Jazareth Lugo Cruz (Num. Control: 87654321)
+        </div>
+        
+        <div class="instrucciones">
+            🕹️ <strong>Instrucciones:</strong> [W,A,S,D] Caminar | [R] Recargar | [Click Izquierdo] Disparar | [Q/E] Giro de 90° | [Ratón] Mover cámara
+        </div>
+    </footer>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
