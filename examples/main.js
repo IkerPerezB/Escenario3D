@@ -355,6 +355,41 @@ function cargarPersonajeFBX() {
             }
         });
         scene.add(character);
+        // --- NUEVO: EQUIPAR EL ARMA EN LA MANO ---
+        // Buscamos el hueso de la mano derecha de Mixamo
+        const manoDerecha = character.getObjectByName('mixamorigRightHand');
+        
+        if (manoDerecha) {
+            const gltfLoader = new GLTFLoader();
+            gltfLoader.load('models/gltf/gun.glb', function (gltf) {
+                const arma = gltf.scene;
+                
+                // 1. Escala del arma (ajusta esto si el arma es muy grande o pequeña)
+                arma.scale.set(16, 15, 20); 
+                /* NOTA: Como el personaje está escalado a 0.01, a veces los objetos 
+                   hijos se hacen diminutos. Si no ves el arma, sube la escala. */
+
+                // 2. Activamos las sombras para el arma
+                arma.traverse(function (child) {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+
+                // 3. Posición y Rotación (Tendrás que jugar con estos números)
+                arma.position.set(-2, 22, -2); 
+                arma.rotation.set(0, 0, 4.8); 
+
+                // 4. ¡LA MAGIA! Pegamos el arma a la mano
+                manoDerecha.add(arma);
+            }, undefined, function (error) {
+                console.error('Error al cargar el arma:', error);
+            });
+        } else {
+            console.warn('No se encontró el hueso de la mano derecha.');
+        }
+        // -----------------------------------------
 
         // Configuramos el Mixer en el modelo base
         mixer = new THREE.AnimationMixer(character);
