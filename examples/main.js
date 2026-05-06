@@ -8,6 +8,9 @@ import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 let scene, camera, renderer, controls;
 let boxPersonaje = new THREE.Box3();
 let murosColision = [];
+// 1. VARIABLES GLOBALES
+const teclas = { w: false, a: false, s: false, d: false }; // <-- NUEVA VARIABLE
+let personajeOcupado = false;
 let luzFuego;
 let mixerBandera;
 let mixer, character;
@@ -16,6 +19,7 @@ let clock = new THREE.Clock();
 // Variables de animación
 let currentAction;
 let animCaminar, animRecargar, animDisparar, animIdle;
+let animCaminarAtras, animCaminarIzq, animCaminarDer;
 
 // Variables de sonido
 let sonidoRecarga, sonidoDisparo;
@@ -69,7 +73,8 @@ function init() {
 
     // --- EVENTOS ---
     window.addEventListener('resize', onWindowResize);
-    document.addEventListener('keydown', handleInput);
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
 }
 
 function cargarHDR() {
@@ -339,7 +344,7 @@ function cargarPersonajeFBX() {
     loader.setPath('models/fbx/');
     
     // 1. CARGAMOS EL MODELO BASE (Usaremos Strafe como el cuerpo principal)
-    loader.load('Strafe.fbx', function (object) {
+    loader.load('RelaxPose.fbx', function (object) {
         character = object;
         character.scale.set(0.01, 0.01, 0.01); // Ajuste típico para Mixamo
         
@@ -353,19 +358,44 @@ function cargarPersonajeFBX() {
 
         // Configuramos el Mixer en el modelo base
         mixer = new THREE.AnimationMixer(character);
+        // --- NUEVO: ESCUCHAR CUANDO TERMINA UNA ACCIÓN ÚNICA ---
+        mixer.addEventListener('finished', function(e) {
+            if (e.action === animRecargar || e.action === animDisparar) {
+                personajeOcupado = false; // Liberamos al personaje
+                
+                // Evaluamos si el jugador se quedó presionando alguna tecla de movimiento
+                if (teclas.w) cambiarAnimacion(animCaminar);
+                else if (teclas.s) cambiarAnimacion(animCaminarAtras);
+                else if (teclas.a) cambiarAnimacion(animCaminarIzq);
+                else if (teclas.d) cambiarAnimacion(animCaminarDer);
+                else cambiarAnimacion(animIdle); // Si no tocaba nada, regresa a relax
+            }
+        });
         
         // Extraemos la animación de Strafe (que viene en el índice 0 de este archivo)
-        animCaminar = mixer.clipAction(object.animations[0]);
+        animIdle = mixer.clipAction(object.animations[0]);
         
         // Iniciamos con la animación de caminar
-        animCaminar.play();
-        currentAction = animCaminar;
+        animIdle.play();
+        currentAction = animIdle;
+
+        loader.load('Walk Forward.fbx', (obj) => {
+            animCaminar = mixer.clipAction(obj.animations[0]);
+        });
+        loader.load('Walking Backwards.fbx', (obj) => {
+            animCaminarAtras = mixer.clipAction(obj.animations[0]);
+        });
+        loader.load('Walk Right.fbx', (obj) => {
+            animCaminarDer = mixer.clipAction(obj.animations[0]);
+        });
+        loader.load('Walk Left.fbx', (obj) => {
+            animCaminarIzq = mixer.clipAction(obj.animations[0]);
+        });
 
         // 2. CARGAMOS LA ANIMACIÓN DE RECARGA
         loader.load('Reloading.fbx', function (reloadingObject) {
             // No agregamos reloadingObject a la escena, solo le robamos la animación
             animRecargar = mixer.clipAction(reloadingObject.animations[0]);
-            
             // Hacemos que la recarga se ejecute una sola vez y no en bucle
             animRecargar.setLoop(THREE.LoopOnce);
             animRecargar.clampWhenFinished = true; // Se queda en el último frame al terminar
@@ -375,7 +405,8 @@ function cargarPersonajeFBX() {
         loader.load('Gunplay.fbx', function (gunplayObject) {
             // Igual que antes, solo extraemos la animación
             animDisparar = mixer.clipAction(gunplayObject.animations[0]);
-            
+            animDisparar.setLoop(THREE.LoopOnce);
+            animDisparar.clampWhenFinished = true;
             // Opcional: Si el disparo es de un solo tiro, quitar el bucle.
             // animDisparar.setLoop(THREE.LoopOnce);
         });
@@ -403,46 +434,74 @@ function configurarAudio() {
     });
 }
 
-function handleInput(event) {
+function onKeyDown(event) {
     if(!character) return;
+    const key = event.key.toLowerCase();
+    
+    // Si la tecla presionada es w, a, s, d, la marcamos como "encendida" (true)
+    if (teclas.hasOwnProperty(key)) {
+        teclas[key] = true;
+    }
+    if (personajeOcupado) return;
 
-    switch(event.key.toLowerCase()) {
-        case 'w':
-            //cambiarAnimacion(animCaminar);
-            // Mover hacia adelante según hacia donde esté rotado el personaje [cite: 12]
-            character.translateZ(0.2); 
-            boxPersonaje.setFromObject(character);
-            let hayColision = false;
-            for(let i = 0; i < murosColision.length; i++){
-                if(boxPersonaje.intersectsBox(murosColision[i])){
-                    hayColision = true;
-                    break;
-                }
-            }
-            if(hayColision){
-                character.translateZ(-0.2);
-            } else {
-                cambiarAnimacion(animCaminar);
-            }
-            break;
-        case 'r':
-            cambiarAnimacion(animRecargar);
-            if(sonidoRecarga && !sonidoRecarga.isPlaying) sonidoRecarga.play();
-            break;
-        case 'f': // Usando F para disparar
-            cambiarAnimacion(animDisparar);
-            if(sonidoDisparo && !sonidoDisparo.isPlaying) sonidoDisparo.play();
-            break;
+    switch(key) {
         case 'q':
-            // Requerimiento: Giro de 90° [cite: 9]
+            // Rotación matemática limpia, sin interrumpir la animación actual
             character.rotation.y += Math.PI / 2;
             break;
         case 'e':
             character.rotation.y -= Math.PI / 2;
             break;
-        case 's': // Detenerse
-            cambiarAnimacion(animIdle);
+        case 'r':
+            personajeOcupado = true; // Bloquea el movimiento
+            cambiarAnimacion(animRecargar);
+            if(sonidoRecarga && !sonidoRecarga.isPlaying) sonidoRecarga.play();
             break;
+        case 'f':
+            personajeOcupado = true; // Bloquea el movimiento
+            cambiarAnimacion(animDisparar);
+            if(sonidoDisparo && !sonidoDisparo.isPlaying) sonidoDisparo.play();
+            break;
+    }
+}
+
+function onKeyUp(event) {
+    if(!character) return;
+    const key = event.key.toLowerCase();
+    
+    // Al soltar la tecla, la marcamos como "apagada" (false)
+    if (teclas.hasOwnProperty(key)) {
+        teclas[key] = false;
+        
+        // Si ya soltamos TODAS las teclas de movimiento, volvemos a la animación Idle
+        if (!personajeOcupado && !teclas.w && !teclas.a && !teclas.s && !teclas.d) {
+            cambiarAnimacion(animIdle);
+        }
+    }
+}
+
+function intentarMover(deltaX, deltaZ, animacionNueva) {
+    // 1. Cambiamos a la animación correspondiente
+    cambiarAnimacion(animacionNueva);
+    
+    // 2. Movemos al personaje
+    character.translateZ(deltaZ);
+    character.translateX(deltaX);
+
+    // 3. Revisamos si con ese movimiento chocó con algo
+    boxPersonaje.setFromObject(character);
+    let hayColision = false;
+    for(let i = 0; i < murosColision.length; i++){
+        if(boxPersonaje.intersectsBox(murosColision[i])){
+            hayColision = true;
+            break;
+        }
+    }
+
+    // 4. Si chocó, lo regresamos a donde estaba (anulamos el movimiento)
+    if(hayColision){
+        character.translateZ(-deltaZ);
+        character.translateX(-deltaX);
     }
 }
 
@@ -471,6 +530,19 @@ function animate() {
     }
 
     const delta = clock.getDelta();
+    
+    // --- NUEVA LÓGICA DE MOVIMIENTO CONTINUO ---
+    if (character && !personajeOcupado) {
+        // Velocidad basada en el tiempo (delta) para que se mueva igual en cualquier PC
+        const velocidad = 1.0 * delta; 
+
+        if (teclas.w) intentarMover(0, velocidad, animCaminar);
+        if (teclas.s) intentarMover(0, -velocidad, animCaminarAtras);
+        if (teclas.a) intentarMover(velocidad, 0, animCaminarIzq); 
+        if (teclas.d) intentarMover(-velocidad, 0, animCaminarDer);
+    }
+    // -------------------------------------------
+
     if (mixer) mixer.update(delta); // Actualizar animaciones
     if (mixerBandera) mixerBandera.update(delta);
 
