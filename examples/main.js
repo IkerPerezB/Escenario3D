@@ -154,7 +154,7 @@ function cargarMuro(x, z, rotacionY) {
 
 // Ejemplo para colocar 5 muros en diferentes posiciones
 cargarMuro(-15, 0, 0);
-cargarMuro(-15, -25, 0);
+cargarMuro(-15, -15, 0);
 cargarMuro(-10, 15, Math.PI / 2);
 cargarMuro(5, 15, Math.PI / 2);
 //cargarMuro(-5, -5, Math.PI / 10);
