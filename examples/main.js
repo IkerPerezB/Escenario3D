@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {VRButton} from 'three/addons/webxr/VRButton.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 
 // 1. VARIABLES GLOBALES
@@ -13,6 +14,7 @@ const teclas = { w: false, a: false, s: false, d: false }; // <-- NUEVA VARIABLE
 let personajeOcupado = false;
 let luzFuego;
 let mixerBandera;
+let playerGroup;
 let mixer, character;
 let clock = new THREE.Clock();
 
@@ -36,11 +38,14 @@ function init() {
 
     // --- RENDERER ---
     renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight - 80); // Ajuste por el footer
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight); // Ajuste por el footer
     renderer.shadowMap.enabled = true;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
     container.appendChild(renderer.domElement);
+    renderer.xr.enabled = true;
+    document.body.appendChild(VRButton.createButton(renderer));
 
     // --- CÁMARA ---
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / (window.innerHeight - 80), 0.1, 100);
@@ -71,6 +76,32 @@ function init() {
     // --- CONFIGURAR AUDIO ---
     configurarAudio();
 
+    // --- LLAMAR SETUP ANIMATION LOOP ---
+    setupAnimationLoop();
+
+    // --- CREAR VARIABLE DE JUGADOR ---
+    playerGroup = new THREE.Group();
+    scene.add(playerGroup);
+    playerGroup.add(character);
+    playerGroup.add(camera);
+
+    // --- DEFINIR CONTROLES DE VR ---
+    const controller1 = renderer.xr.getController(0);
+    const controller2 = renderer.xr.getController(1);
+    controller1.addEventListener('selectstart', () => {
+        if (!personajeOcupado) {
+            personajeOcupado = true;
+            cambiarAnimacion(animDisparar);
+            if (sonidoDisparo && !sonidoDisparo.isPlaying) sonidoDisparo.play();
+        }
+    });
+    controller2.addEventListener('selectstart', () => {
+        if (!personajeOcupado) {
+            personajeOcupado = true;
+            cambiarAnimacion(animDisparar);
+            if (sonidoDisparo && !sonidoDisparo.isPlaying) sonidoDisparo.play();
+        }
+    });
     // --- EVENTOS ---
     window.addEventListener('resize', onWindowResize);
     document.addEventListener('keydown', onKeyDown);
@@ -557,29 +588,22 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight - 80);
 }
 
-function animate() {
-    requestAnimationFrame(animate);
+// Reemplaza tu función animate() actual por esta estructura
+function setupAnimationLoop() {
+    renderer.setAnimationLoop(render);
+}
 
-    if(luzFuego){
-        luzFuego.intensity = 3 + Math.random()*2;
-    }
-
+function render() {
     const delta = clock.getDelta();
     
-    // --- NUEVA LÓGICA DE MOVIMIENTO CONTINUO ---
-    if (character && !personajeOcupado) {
-        // Velocidad basada en el tiempo (delta) para que se mueva igual en cualquier PC
-        const velocidad = 1.0 * delta; 
-
-        if (teclas.w) intentarMover(0, velocidad, animCaminar);
-        if (teclas.s) intentarMover(0, -velocidad, animCaminarAtras);
-        if (teclas.a) intentarMover(velocidad, 0, animCaminarIzq); 
-        if (teclas.d) intentarMover(-velocidad, 0, animCaminarDer);
-    }
-    // -------------------------------------------
-
-    if (mixer) mixer.update(delta); // Actualizar animaciones
+    // Actualiza animaciones
+    if (mixer) mixer.update(delta);
     if (mixerBandera) mixerBandera.update(delta);
+
+    // Aquí iría tu lógica de movimiento (ahora aplicada al playerGroup)
+    actualizarMovimientoVR(delta);
 
     renderer.render(scene, camera);
 }
+
+// Llama a setupAnimationLoop() al final de tu init()
